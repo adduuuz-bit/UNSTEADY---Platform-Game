@@ -27,7 +27,7 @@ A physics-based platformer with dynamic difficulty progression where players mus
 ### Implementation
 
 #### Installation / Setup
-[To build and run the game manually from source:]
+https://github.com/adduuuz-bit/UNSTEADY---Platform-Game.git
 
 **Example:**
 ```bash
@@ -39,19 +39,19 @@ A physics-based platformer with dynamic difficulty progression where players mus
 
 ### Screenshots (Add at least 3)
 
-![Screenshot1](Add screenshot 1 link)  
-*Add caption explaining what this shows*
+https://drive.google.com/file/d/1bi7svvo5CNbJotSg0wzODSq_jUC-DjpX/view?usp=drive_link
+The Starting menu of the game
 
-![Screenshot2](Add screenshot 2 link)  
-*Add caption explaining what this shows*
+https://drive.google.com/file/d/1Vq-BmZspHZjcqtnZJM4_jlI3vRz0AvJV/view?usp=drive_link 
+Playing the game
 
-![Screenshot3](Add screenshot 3 link)  
-*Add caption explaining what this shows*
+https://drive.google.com/file/d/1ctlNB1OeNwXY-NywlPYuPCSaVMRTUw9k/view?usp=drive_link
+Lost playing
 
 ### Game Demo
 
 #### Gameplay Video
-[Add link to gameplay video]  
+https://drive.google.com/file/d/1Qs3XWlD1qOshsV7sw7rQ_YhDGhbJ0IFH/view?usp=drive_link  
 
 ## Game Download / Deployment
 - **Playable Version / Download:** [Link to executable or archive]
