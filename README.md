@@ -1,29 +1,28 @@
 <img width="3188" height="1202" alt="hackcade github banner v2" src="https://github.com/user-attachments/assets/0c4c3dcb-c5f7-46e7-965d-e4571edb09e9" />
 
-# [Game Name] 
+# UNSTEADY - Platform Game 
 
 ## Basic Details
 
-**Team Name:** [Your Team Name]
+**Team Name:** Pseudocoders
 
 ### Team Members
-- **Team Lead:** [Name] - [College]
-- **Member 2:** [Name] - [College]
-- **Member 3:** [Name] - [College]
+- **Team Lead:** Mohammed Navaf - TKMCE
+- **Member 2:** Abdul Rahman - TKMCE
 
 ## Game Description
-[2-3 lines about what your game is, the genre, and what makes it fun or unique.]
+UNSTEADY is a challenging platform game where you control a bouncing ball navigating through moving platforms. Avoid deadly black platforms while trying to achieve the highest score possible as the difficulty increases.
 
 ## The Concept
-[Explain the core idea of the game—story, gameplay mechanics, or main objective.]
+A physics-based platformer with dynamic difficulty progression where players must balance precision timing with strategic platform navigation to survive as long as possible.
 
 ## Technical Details
 
 ### Technologies Used
-- **Languages:** [C#, Python, JavaScript, etc.]
-- **Game Engines/Frameworks:** [Unity, Unreal Engine, Godot, Phaser, etc.]
-- **Libraries/Assets:** [Any relevant libraries, APIs, or assets used]
-- **Tools:** [Version control, graphic editors, sound tools, etc.]
+- **Languages:** Html, Css, Javacript
+- **Game Engines/Frameworks:** HTML5 Canvas
+- **Libraries/Assets:** Google Fonts
+- **Tools:** None
 
 ### Implementation
 
