@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNSTEADY - Platform Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Orbitron', sans-serif;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            font-family: 'Orbitron', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 900px;
+            text-align: center;
+        }
+        
+        #gameCanvas {
+            border: 3px solid #4cc9f0;
+            border-radius: 8px;
+            background: #0d1b2a;
+            box-shadow: 0 0 20px rgba(76, 201, 240, 0.5);
+        }
+        
+        #ui-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .score-display {
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px rgba(76, 201, 240, 1);
+            padding: 5px 15px;
+            background: rgba(13, 27, 42, 0.7);
+            border-radius: 5px;
+        }
+        
+        #title {
+            font-size: 2.5rem;
+            letter-spacing: 4px;
+            margin: 10px 0;
+            text-shadow: 0 0 15px rgba(76, 201, 240, 1);
+            color: #4cc9f0;
+        }
+        
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(13, 27, 42, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #4cc9f0;
+            box-shadow: 0 0 25px rgba(76, 201, 240, 0.7);
+            z-index: 10;
+            width: 300px;
+        }
+        
+        #menu h2 {
+            margin-top: 0;
+            color: #4cc9f0;
+            font-size: 2rem;
+        }
+        
+        button {
+            background: #4cc9f0;
+            color: #0d1b2a;
+            border: none;
+            padding: 12px 25px;
+            margin: 10px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 200px;
+        }
+        
+        button:hover {
+            background: #f72585;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(247, 37, 133, 0.7);
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #instructions {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-container">
+            <div class="score-display">SCORE: <span id="score">0</span></div>
+            <div id="title">UNSTEADY</div>
+            <div class="score-display">HIGHSCORE: <span id="highscore">0</span></div>
+        </div>
+        
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+        
+        <div id="menu">
+            <h2>UNSTEADY</h2>
+            <button id="new-game-button">New Game</button>
+            <button id="exit-game-button">Exit Game</button>
+            <div id="instructions">
+                <p>Use LEFT and RIGHT arrows to move the ball</p>
+                <p>Press SPACE to make the ball bounce</p>
+                <p>Avoid black platforms - they will end your game!</p>
+                <p>Successfully avoiding black platforms gives 2x points!</p>
+                <p>Balance the ball and don't let it fall off the screen!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+        const GRAVITY = 0.5;
+        const FRICTION = 0.9;
+        const PLATFORM_WIDTH = 100;
+        const PLATFORM_HEIGHT = 7;
+        const PLATFORM_TRIANGLE_SIZE = 14;
+        const BALL_SPEED = 0.8; // Reduced for slower movement
+        const PLATFORM_SPEED = 0.4;
+        const PLATFORM_TILT_FACTOR = 0.01;
+        const BOUNCE_FORCE = -8;
+        const MAX_FALL_DISTANCE = 3000;
+
+        let platforms = [];
+        let ball;
+        let score = 0;
+        let highscore = 0;
+        let gameOver = true;
+        let cameraOffset = 0;
+        let parallaxLayers = [];
+        let lastTimestamp = 0;
+        let leftKeyPressed = false;
+        let rightKeyPressed = false;
+        let spaceKeyPressed = false;
+        let platformGenerationY = 0;
+        let lastPlatformContactY = 0;
+        let blastAnimation = null;
+        let showYouLost = false;
+        let youLostTimer = 0;
+        let accumulatedTime = 0;
+        let previousScore = 0;
+        let platformPatternCounter = 0; // Added to fix pattern generation
+
+        const newGameButton = document.getElementById('new-game-button');
+        const exitGameButton = document.getElementById('exit-game-button');
+        const scoreDisplay = document.getElementById('score');
+        const highscoreDisplay = document.getElementById('highscore');
+        const menu = document.getElementById('menu');
+
+        // Blast animation class
+        class BlastAnimation {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 15;
+                this.particles = [];
+                this.duration = 90;
+                this.frame = 0;
+                
+                // Create explosion particles that will continue to fall
+                for (let i = 0; i < 30; i++) {
+                    this.particles.push({
+                        x: this.x,
+                        y: this.y,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 4 - 2,
+                        radius: Math.random() * 6 + 2,
+                        color: `hsl(${Math.random() * 60}, 100%, 50%)`,
+                        gravity: GRAVITY * (0.5 + Math.random() * 0.5)
+                    });
+                }
+            }
+            
+            update() {
+                this.frame++;
+                
+                // Update particles - they continue to fall with gravity
+                for (let particle of this.particles) {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.vy += particle.gravity;
+                    particle.vx *= 0.98;
+                    particle.vy *= 0.98;
+                    particle.radius *= 0.99;
+                }
+                
+                // Animation continues until particles are gone
+                return this.frame < this.duration;
+            }
+            
+            draw() {
+                // Draw particles
+                for (let particle of this.particles) {
+                    if (particle.radius > 0.5) {
+                        ctx.beginPath();
+                        ctx.fillStyle = particle.color;
+                        ctx.arc(particle.x, particle.y - cameraOffset, particle.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Add glow effect
+                        ctx.beginPath();
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        ctx.arc(particle.x, particle.y - cameraOffset, particle.radius / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // Draw "YOU LOST" message with pixelated effect
+        function drawYouLost() {
+            youLostTimer++;
+            
+            // Draw semi-transparent background
+            ctx.fillStyle = 'rgba(13, 27, 42, 0.8)';
+            ctx.fillRect(WIDTH/2 - 200, HEIGHT/2 - 60, 400, 120);
+            
+            // Draw "YOU LOST" text with pixelated effect
+            ctx.font = 'bold 60px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#4cc9f0';
+            ctx.fillText('YOU LOST', WIDTH/2, HEIGHT/2);
+            
+            // Add pixelated effect by drawing small rectangles over the text
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * 400 + (WIDTH/2 - 200);
+                const y = Math.random() * 120 + (HEIGHT/2 - 60);
+                const size = Math.random() * 4 + 2;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            // Show menu after delay
+            if (youLostTimer > 90) {
+                menu.style.display = 'block';
+                showYouLost = false;
+            }
+        }
+
+        // Utility to create platforms with position, tilt angle, and colors
+        function createPlatform(x, y, angle = 0, color = "white", triangleColor = "white") {
+            // Black platforms move 50% faster than white platforms
+            const speed = color === "#000" ? PLATFORM_SPEED * 1.5 : PLATFORM_SPEED;
+            
+            return { 
+                x, 
+                y, 
+                angle, 
+                color, 
+                triangleColor, 
+                width: PLATFORM_WIDTH, 
+                height: PLATFORM_HEIGHT,
+                speed: speed,
+                direction: Math.random() > 0.5 ? 1 : -1,
+                passed: false
+            };
+        }
+
+        // Generate new platforms as the ball descends
+        function generatePlatforms() {
+            while (platformGenerationY < cameraOffset + HEIGHT * 2) {
+                // Create more alternating pattern for easier gameplay
+                let x;
+                
+                // Use a counter to ensure proper pattern distribution
+                const patternType = platformPatternCounter % 4;
+                platformPatternCounter++;
+                
+                switch (patternType) {
+                    case 0: // Left
+                        x = WIDTH/4 - PLATFORM_WIDTH/2;
+                        break;
+                    case 1: // Center
+                        x = WIDTH/2 - PLATFORM_WIDTH/2;
+                        break;
+                    case 2: // Right
+                        x = 3*WIDTH/4 - PLATFORM_WIDTH/2;
+                        break;
+                    case 3: // Center again for easier flow
+                        x = WIDTH/2 - PLATFORM_WIDTH/2;
+                        break;
+                }
+                
+                const y = platformGenerationY;
+                
+                // Create a mix of regular and black platforms (1 in 4 chance for black)
+                if (Math.random() < 0.25) {
+                    platforms.push(createPlatform(x, y, 0, "#000", "#000"));
+                } else {
+                    platforms.push(createPlatform(x, y));
+                }
+                
+                platformGenerationY += 120 + Math.random() * 30;
+            }
+        }
+
+        // Create parallax background layers
+        function createParallaxLayers() {
+            parallaxLayers = [];
+            for (let i = 0; i < 5; i++) {
+                parallaxLayers.push({
+                    speed: 0.1 + (i * 0.1),
+                    stars: []
+                });
+                
+                for (let j = 0; j < 50; j++) {
+                    parallaxLayers[i].stars.push({
+                        x: Math.random() * WIDTH,
+                        y: Math.random() * HEIGHT * 3,
+                        size: Math.random() * 2 + 1
+                    });
+                }
+            }
+        }
+
+        // Draw parallax background
+        function drawParallax() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+            gradient.addColorStop(0, "#0d1b2a");
+            gradient.addColorStop(1, "#1a1a2e");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            parallaxLayers.forEach((layer, index) => {
+                ctx.fillStyle = index < 2 ? "#4cc9f0" : "#ffffff";
+                layer.stars.forEach(star => {
+                    const yPos = (star.y - cameraOffset * layer.speed) % (HEIGHT * 3);
+                    ctx.beginPath();
+                    ctx.arc(star.x, yPos, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            });
+        }
+
+        // Ball object class
+        class Ball {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 15;
+                this.vx = 0;
+                this.vy = 0;
+                this.onPlatform = false;
+                this.platformIndex = -1;
+                this.canBounce = true;
+                this.bounceCooldown = 0;
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.fillStyle = '#ff0000';
+                ctx.arc(this.x, this.y - cameraOffset, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.arc(this.x - 5, this.y - cameraOffset - 5, this.radius / 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            update(deltaTime) {
+                // Apply keyboard controls with fixed delta time
+                if (leftKeyPressed) {
+                    this.vx -= BALL_SPEED;
+                }
+                if (rightKeyPressed) {
+                    this.vx += BALL_SPEED;
+                }
+                
+                // Apply bounce if space is pressed and cooldown is ready
+                if (spaceKeyPressed && this.canBounce && this.onPlatform) {
+                    this.vy = BOUNCE_FORCE;
+                    this.canBounce = false;
+                    this.bounceCooldown = 20;
+                    this.onPlatform = false;
+                    this.platformIndex = -1;
+                }
+                
+                // Update bounce cooldown
+                if (this.bounceCooldown > 0) {
+                    this.bounceCooldown--;
+                } else {
+                    this.canBounce = true;
+                }
+                
+                // Always apply gravity
+                this.vy += GRAVITY;
+                
+                if (this.onPlatform && this.platformIndex >= 0) {
+                    const platform = platforms[this.platformIndex];
+                    const centerX = platform.x + platform.width / 2;
+                    const platformSurfaceY = platform.y - this.radius - (Math.sin(platform.angle) * (this.x - centerX));
+                    const maxTiltOffset = platform.width / 2 - this.radius;
+                    
+                    if (Math.abs(this.x - centerX) > maxTiltOffset) {
+                        this.onPlatform = false;
+                        this.platformIndex = -1;
+                    } else {
+                        this.y = platformSurfaceY;
+                        this.vy = 0;
+                        this.vx *= FRICTION;
+                        lastPlatformContactY = this.y;
+                    }
+                }
+                
+                // Apply velocity
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= FRICTION;
+                
+                // Screen boundaries
+                if (this.x < this.radius) {
+                    this.x = this.radius;
+                    this.vx *= -0.5;
+                } else if (this.x > WIDTH - this.radius) {
+                    this.x = WIDTH - this.radius;
+                    this.vx *= -0.5;
+                }
+                
+                // Check if ball is falling below screen (only way to game over besides black platforms)
+                if (this.y - cameraOffset > HEIGHT + 100) {
+                    triggerGameOver();
+                }
+                
+                // Update camera to follow ball - zoomed out view
+                const targetOffset = this.y - HEIGHT * 0.4; // Changed from 0.6 to 0.4 for more zoomed out view
+                cameraOffset += (targetOffset - cameraOffset) * 0.05;
+                cameraOffset = Math.max(0, cameraOffset);
+                
+                // Update score based on platforms passed
+                updateScore();
+            }
+        }
+
+        function initPlatforms() {
+            platforms = [];
+            platformGenerationY = 0;
+            platformPatternCounter = 0; // Reset pattern counter
+            
+            // Create initial platforms with more alternating pattern for easier jumping
+            for (let i = 0; i < 15; i++) {
+                // More predictable pattern for easier gameplay
+                let x;
+                const patternType = i % 4;
+                
+                switch (patternType) {
+                    case 0: // Left
+                        x = WIDTH/4 - PLATFORM_WIDTH/2;
+                        break;
+                    case 1: // Center
+                        x = WIDTH/2 - PLATFORM_WIDTH/2;
+                        break;
+                    case 2: // Right
+                        x = 3*WIDTH/4 - PLATFORM_WIDTH/2;
+                        break;
+                    case 3: // Center again for easier flow
+                        x = WIDTH/2 - PLATFORM_WIDTH/2;
+                        break;
+                }
+                
+                const y = i * 120 + 200;
+                platforms.push(createPlatform(x, y));
+                platformGenerationY = y + 120 + Math.random() * 30;
+            }
+            
+            lastPlatformContactY = 200;
+        }
+
+        function drawPlatform(p) {
+            ctx.save();
+            ctx.translate(p.x + p.width / 2, p.y - cameraOffset);
+            ctx.rotate(p.angle);
+            ctx.lineCap = "round";
+            ctx.lineWidth = p.color === "black" || p.color === "#000" ? 8 : 6;
+            ctx.strokeStyle = p.color;
+            ctx.beginPath();
+            ctx.moveTo(-p.width/2, 0);
+            ctx.lineTo(p.width/2, 0);
+            ctx.stroke();
+            
+            ctx.fillStyle = p.triangleColor;
+            ctx.beginPath();
+            ctx.moveTo(0, 8);
+            ctx.lineTo(6, 20);
+            ctx.lineTo(-6, 20);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function updatePlatforms(deltaTime) {
+            generatePlatforms();
+            
+            platforms.forEach(p => {
+                p.x += p.speed * p.direction;
+                
+                // Reverse direction at edges (keep platforms inside canvas)
+                if (p.x <= 0) {
+                    p.x = 0;
+                    p.direction *= -1;
+                } else if (p.x + p.width >= WIDTH) {
+                    p.x = WIDTH - p.width;
+                    p.direction *= -1;
+                }
+                
+                if (ball) {
+                    const centerX = p.x + p.width / 2;
+                    const distanceX = ball.x - centerX;
+                    p.angle = distanceX * PLATFORM_TILT_FACTOR;
+                    p.angle = Math.max(-0.2, Math.min(0.2, p.angle));
+                }
+            });
+        }
+
+        function updateScore() {
+            platforms.forEach(p => {
+                if (!p.passed && p.y < ball.y) {
+                    p.passed = true;
+                    
+                    // Award points for passing platforms
+                    if (p.color === "#000") {
+                        // 2x points for avoiding black platforms
+                        score += 20;
+                    } else {
+                        // Regular points for white platforms
+                        score += 10;
+                    }
+                    
+                    // Update score display
+                    scoreDisplay.textContent = score;
+                    
+                    if (score > highscore) {
+                        highscore = score;
+                        highscoreDisplay.textContent = highscore;
+                    }
+                }
+            });
+        }
+
+        function checkCollision(ball, platform, index) {
+            const cx = platform.x + platform.width / 2;
+            const cy = platform.y;
+            const dx = ball.x - cx;
+            const surfaceY = cy + Math.sin(platform.angle) * dx;
+            
+            const isAbovePlatform = ball.y + ball.radius > surfaceY - 15 && ball.y + ball.radius < surfaceY + 5;
+            const isWithinWidth = ball.x + ball.radius > platform.x && ball.x - ball.radius < platform.x + platform.width;
+            const isMovingDownward = ball.vy >= 0;
+            
+            if (isWithinWidth && isAbovePlatform && isMovingDownward) {
+                if (platform.color === "#000") {
+                    // Create blast animation
+                    blastAnimation = new BlastAnimation(ball.x, ball.y);
+                    triggerGameOver();
+                    return false;
+                }
+                
+                ball.y = surfaceY - ball.radius;
+                ball.vy = 0;
+                ball.onPlatform = true;
+                ball.platformIndex = index;
+                lastPlatformContactY = ball.y;
+                return true;
+            }
+            
+            return false;
+        }
+
+        function triggerGameOver() {
+            gameOver = true;
+            showYouLost = true;
+            youLostTimer = 0;
+            newGameButton.disabled = false;
+            exitGameButton.disabled = true;
+            
+            // Store the score before resetting
+            previousScore = score;
+        }
+
+        function updateGame(timestamp) {
+            if (gameOver) {
+                // Continue to draw blast animation even when game is over
+                if (blastAnimation) {
+                    const continueAnimation = blastAnimation.update();
+                    
+                    drawParallax();
+                    
+                    updatePlatforms(16); // Use fixed delta time
+                    platforms.forEach((p, idx) => {
+                        if (p.y - cameraOffset > -100 && p.y - cameraOffset < HEIGHT + 100) {
+                            drawPlatform(p);
+                        }
+                    });
+                    
+                    if (continueAnimation) {
+                        blastAnimation.draw();
+                    }
+                }
+                
+                // Draw "YOU LOST" message if needed
+                if (showYouLost) {
+                    drawYouLost();
+                }
+                
+                lastTimestamp = timestamp;
+                requestAnimationFrame(updateGame);
+                return;
+            }
+            
+            const deltaTime = Math.min(timestamp - lastTimestamp, 100); // Cap delta time to prevent lag
+            lastTimestamp = timestamp;
+            
+            // Use fixed time step for physics to prevent lag
+            accumulatedTime += deltaTime;
+            while (accumulatedTime >= 16) { // 60fps fixed update
+                drawParallax();
+                
+                updatePlatforms(16);
+                platforms.forEach((p, idx) => {
+                    if (p.y - cameraOffset > -100 && p.y - cameraOffset < HEIGHT + 100) {
+                        drawPlatform(p);
+                    }
+                });
+                
+                ball.update(16);
+                
+                let onPlatform = false;
+                
+                for (let i = 0; i < platforms.length; i++) {
+                    if (checkCollision(ball, platforms[i], i)) {
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                
+                if (!onPlatform) {
+                    ball.onPlatform = false;
+                    ball.platformIndex = -1;
+                }
+                
+                accumulatedTime -= 16;
+            }
+            
+            ball.draw();
+            
+            requestAnimationFrame(updateGame);
+        }
+
+        function startGame() {
+            // Reset all platforms and mark them as not passed
+            initPlatforms();
+            
+            // Always start on the first platform in the middle
+            const startingPlatform = platforms[0];
+            const platformCenterX = startingPlatform.x + startingPlatform.width / 2;
+            
+            ball = new Ball(platformCenterX, startingPlatform.y - 15);
+            ball.onPlatform = true;
+            ball.platformIndex = 0;
+            
+            // Make the ball bounce slightly at the start
+            ball.vy = BOUNCE_FORCE * 0.5;
+            ball.onPlatform = false;
+            
+            // Reset score but keep highscore
+            score = 0;
+            scoreDisplay.textContent = score;
+            
+            gameOver = false;
+            cameraOffset = 0;
+            blastAnimation = null;
+            showYouLost = false;
+            menu.style.display = 'none'; // Fixed: Hide the menu
+            newGameButton.disabled = true;
+            exitGameButton.disabled = false;
+            lastTimestamp = performance.now();
+            accumulatedTime = 0;
+            lastPlatformContactY = ball.y;
+            requestAnimationFrame(updateGame);
+        }
+
+        function exitGame() {
+            gameOver = true;
+            newGameButton.disabled = false;
+            exitGameButton.disabled = true;
+            menu.style.display = 'block'; // Fixed: Show the menu
+        }
+
+        function bindEvents() {
+            newGameButton.addEventListener('click', () => {
+                startGame();
+            });
+            
+            exitGameButton.addEventListener('click', () => {
+                exitGame();
+            });
+            
+            exitGameButton.disabled = true;
+            
+            window.addEventListener('keydown', (e) => {
+                if (gameOver) return;
+                
+                if (e.key === 'ArrowLeft') {
+                    leftKeyPressed = true;
+                }
+                
+                if (e.key === 'ArrowRight') {
+                    rightKeyPressed = true;
+                }
+                
+                if (e.key === ' ') {
+                    spaceKeyPressed = true;
+                    e.preventDefault();
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                if (gameOver) return;
+                
+                if (e.key === 'ArrowLeft') {
+                    leftKeyPressed = false;
+                }
+                
+                if (e.key === 'ArrowRight') {
+                    rightKeyPressed = false;
+                }
+                
+                if (e.key === ' ') {
+                    spaceKeyPressed = false;
+                }
+            });
+        }
+
+        // Initialize game elements
+        initPlatforms();
+        createParallaxLayers();
+        bindEvents();
+
+        // Show menu immediately on startup
+        menu.style.display = 'block'; // Fixed: Show the menu
+
+        // Draw initial screen (just the background)
+        drawParallax();
+    </script>
+</body>
+</html>
